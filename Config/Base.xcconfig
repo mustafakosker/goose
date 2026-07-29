@@ -1,0 +1,19 @@
+// Shared build settings for the Goose targets.
+//
+// Signing-related values differ per developer, so they are indirected through
+// variables here instead of being hardcoded in the Xcode project. The defaults
+// below match the upstream project. To build with your own Apple Developer
+// team, create Config/Local.xcconfig (gitignored) and override them there:
+//
+//   GOOSE_BUNDLE_ID_PREFIX = com.example.goose
+//   GOOSE_DEVELOPMENT_TEAM = ABCDE12345
+//
+// A free Personal Team cannot register com.goose.swift, so a local override is
+// required to build onto a physical device.
+
+GOOSE_BUNDLE_ID_PREFIX = com.goose.swift
+GOOSE_DEVELOPMENT_TEAM =
+
+// Optional, so a clean checkout without Config/Local.xcconfig still builds.
+// Keep last: later assignments win.
+#include? "Local.xcconfig"

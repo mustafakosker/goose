@@ -1,6 +1,8 @@
 .DS_Store
 xcuserdata/
 *.xcuserstate
+**/*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+**/*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
 DerivedData/
 build/
 *.ipa
@@ -16,3 +18,4 @@ Rust/iphoneos/
 Rust/iphonesimulator/
 Vendor/CodexRust/codex-rs/target/
 tmp/
+Config/Local.xcconfig

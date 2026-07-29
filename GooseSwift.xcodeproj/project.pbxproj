@@ -173,6 +173,7 @@
 	/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E10000000000000000000001 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Base.xcconfig; path = Config/Base.xcconfig; sourceTree = "<group>"; };
 		A20000000000000000000001 /* GooseSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooseSwiftApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* GooseAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooseAppModel.swift; sourceTree = "<group>"; };
 			D2000000000000000000003A /* GooseAppModel+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GooseAppModel+Lifecycle.swift"; sourceTree = "<group>"; };
@@ -344,6 +345,7 @@
 		A40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				E10000000000000000000001 /* Base.xcconfig */,
 				A40000000000000000000002 /* GooseSwift */,
 				B40000000000000000000001 /* GooseWorkoutLiveActivityExtension */,
 				A40000000000000000000003 /* Scripts */,
@@ -818,6 +820,7 @@
 /* Begin XCBuildConfiguration section */
 		A80000000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E10000000000000000000001 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -879,6 +882,7 @@
 		};
 		A80000000000000000000002 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E10000000000000000000001 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -940,6 +944,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = GooseSwift/GooseSwift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(GOOSE_DEVELOPMENT_TEAM)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -963,7 +968,7 @@
 					"-force_load",
 					"$(SRCROOT)/Rust/$(PLATFORM_NAME)/libgoose_core.a",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.goose.swift;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GOOSE_BUNDLE_ID_PREFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -983,6 +988,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = GooseSwift/GooseSwift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(GOOSE_DEVELOPMENT_TEAM)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -1006,7 +1012,7 @@
 					"-force_load",
 					"$(SRCROOT)/Rust/$(PLATFORM_NAME)/libgoose_core.a",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.goose.swift;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GOOSE_BUNDLE_ID_PREFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1024,6 +1030,7 @@
 				ARCHS = arm64;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(GOOSE_DEVELOPMENT_TEAM)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = GooseWorkoutLiveActivityExtension/Info.plist;
@@ -1035,7 +1042,7 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.goose.swift.WorkoutLiveActivityExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GOOSE_BUNDLE_ID_PREFIX).WorkoutLiveActivityExtension";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1053,6 +1060,7 @@
 				ARCHS = arm64;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(GOOSE_DEVELOPMENT_TEAM)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = GooseWorkoutLiveActivityExtension/Info.plist;
@@ -1063,7 +1071,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.goose.swift.WorkoutLiveActivityExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GOOSE_BUNDLE_ID_PREFIX).WorkoutLiveActivityExtension";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

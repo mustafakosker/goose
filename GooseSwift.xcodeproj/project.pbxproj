@@ -634,20 +634,22 @@
 /* Begin PBXShellScriptBuildPhase section */
 			A60000000000000000000004 /* Build Rust Core */ = {
 			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
+				"$(SRCROOT)/Scripts/rust-core-inputs.xcfilelist",
 			);
 			inputPaths = (
-				"$(SRCROOT)/Rust/core/Cargo.toml",
+				"$(SRCROOT)/Rust/core/src",
 			);
 			name = "Build Rust Core";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 				"$(SRCROOT)/Rust/$(PLATFORM_NAME)/libgoose_core.a",
+				"$(SRCROOT)/Rust/$(PLATFORM_NAME)/.goose_core.target",
+				"$(SRCROOT)/Rust/$(PLATFORM_NAME)/.goose_core.profile",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

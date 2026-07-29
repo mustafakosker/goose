@@ -11,6 +11,33 @@ if [[ "${GOOSE_SKIP_RUST_CORE_BUILD:-0}" == "1" ]]; then
   exit 0
 fi
 
+# Xcode.app build phases do not inherit a login shell PATH, so cargo is often
+# missing here even when it works in a terminal.
+if ! command -v cargo >/dev/null 2>&1; then
+  for candidate in "${CARGO_HOME:-$HOME/.cargo}/bin" /opt/homebrew/bin /usr/local/bin; do
+    if [[ -x "$candidate/cargo" ]]; then
+      export PATH="$candidate:$PATH"
+      break
+    fi
+  done
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "cargo not found. Install Rust via rustup (https://rustup.rs), then add the iOS targets:" >&2
+  echo "  rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios" >&2
+  exit 1
+fi
+
+INPUT_FILE_LIST="$SCRIPT_DIR/rust-core-inputs.xcfilelist"
+if [[ -f "$INPUT_FILE_LIST" ]]; then
+  while IFS= read -r source_file; do
+    listed_path="${source_file#\$(SRCROOT)/}"
+    if ! grep -qxF "\$(SRCROOT)/$listed_path" "$INPUT_FILE_LIST"; then
+      echo "warning: $listed_path is missing from Scripts/rust-core-inputs.xcfilelist; Xcode may skip the Rust core build after editing it" >&2
+    fi
+  done < <(cd "$APP_DIR" && find Rust/core/src -name '*.rs' | sort)
+fi
+
 CONFIGURATION="${CONFIGURATION:-Debug}"
 PLATFORM_NAME="${PLATFORM_NAME:-iphonesimulator}"
 CURRENT_ARCH="${CURRENT_ARCH:-${ARCHS:-arm64}}"

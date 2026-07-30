@@ -11,6 +11,7 @@ struct OnboardingView: View {
   @StateObject private var locationPermissionRequester = OnboardingLocationPermissionRequester()
 
   @State private var step = OnboardingStep.healthKit
+  @State private var stepHistory: [OnboardingStep] = []
   @State private var dateOfBirth = OnboardingDate.defaultDateOfBirth()
   @State private var validationMessage: String?
   @State private var healthKitStatus = "Not requested"
@@ -180,13 +181,14 @@ struct OnboardingView: View {
     if step == .connect {
       OnboardingConnectActionBar(
         ble: model.ble,
+        showBack: !stepHistory.isEmpty,
         onBack: moveBack,
         readyTitle: nextAvailableStep(after: step) == nil ? "Finish setup" : "Continue",
         onComplete: moveForward
       )
     } else {
       OnboardingStandardActionBar(
-        showBack: step.previous != nil,
+        showBack: !stepHistory.isEmpty,
         primaryTitle: standardPrimaryTitle,
         onBack: moveBack,
         onPrimary: continueFromCurrentStep
@@ -491,17 +493,19 @@ struct OnboardingView: View {
     }
     validationMessage = nil
     withAnimation(.snappy) {
+      stepHistory.append(step)
       step = next
     }
   }
 
   private func moveBack() {
     refreshPermissionState()
-    guard let previous = previousAvailableStep(before: step) else {
+    guard let previous = stepHistory.last else {
       return
     }
     validationMessage = nil
     withAnimation(.snappy) {
+      stepHistory.removeLast()
       step = previous
     }
   }
@@ -623,14 +627,6 @@ struct OnboardingView: View {
     var candidate = currentStep.next
     while let step = candidate, shouldSkip(step) {
       candidate = step.next
-    }
-    return candidate
-  }
-
-  private func previousAvailableStep(before currentStep: OnboardingStep) -> OnboardingStep? {
-    var candidate = currentStep.previous
-    while let step = candidate, shouldSkip(step) {
-      candidate = step.previous
     }
     return candidate
   }

@@ -19,6 +19,12 @@ extension HealthDataStore {
   /// Matches the granularity `relativeText` renders at, including its 10-second "Now" threshold.
   static let stressSummaryFreshnessBucketSeconds: TimeInterval = 10
 
+  /// While live heart rate streams, the series revision changes on every sample and the
+  /// freshness bucket flips every 10 seconds, so an exact cache key match alone recomputes the
+  /// full day walk on the main thread several times a minute — often mid-scroll. A summary
+  /// this recent is indistinguishable on the dashboard, so reuse it instead of recomputing.
+  static let stressSummaryMinimumReuseSeconds: TimeInterval = 15
+
   /// A single `HomeDashboardView` body pass asks for this many times over, and each run walks a
   /// full day of heart-rate samples. The result only changes when a new sample lands, so cache
   /// it against the series revision.
@@ -34,15 +40,23 @@ extension HealthDataStore {
       previewMissingData: previewMissingData,
       freshnessBucket: Int(Date().timeIntervalSince1970 / Self.stressSummaryFreshnessBucketSeconds)
     )
-    if let cached = stressSummaryCache, cached.key == key {
-      return cached.summary
+    if let cached = stressSummaryCache {
+      if cached.key == key {
+        return cached.summary
+      }
+      if cached.key.dayStart == key.dayStart,
+         cached.key.allowLiveFallbacks == key.allowLiveFallbacks,
+         cached.key.previewMissingData == key.previewMissingData,
+         Date().timeIntervalSince(cached.computedAt) < Self.stressSummaryMinimumReuseSeconds {
+        return cached.summary
+      }
     }
     let summary = computeStressAlgorithmSummary(
       for: date,
       calendar: calendar,
       allowLiveFallbacks: allowLiveFallbacks
     )
-    stressSummaryCache = (key: key, summary: summary)
+    stressSummaryCache = (key: key, summary: summary, computedAt: Date())
     return summary
   }
 

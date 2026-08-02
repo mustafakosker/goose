@@ -34,7 +34,7 @@ final class HealthDataStore: ObservableObject {
   var packetInputIsRunning = false
   var heartRateTimelineRefreshID: UUID?
   var heartRateSeriesUpdateObserver: NSObjectProtocol?
-  var stressSummaryCache: (key: StressSummaryCacheKey, summary: StressAlgorithmSummary)?
+  var stressSummaryCache: (key: StressSummaryCacheKey, summary: StressAlgorithmSummary, computedAt: Date)?
   let packetInputQueue = DispatchQueue(label: "com.goose.swift.health.packet-inputs", qos: .utility)
   let heartRateTimelineQueue = DispatchQueue(label: "com.goose.swift.health.heart-rate-timeline", qos: .utility)
   lazy var databasePath = HealthDataStore.defaultDatabasePath()
@@ -130,8 +130,14 @@ final class HealthDataStore: ObservableObject {
               self.heartRateTimelineRefreshID == refreshID else {
           return
         }
-        self.heartRateHourlyRanges = snapshot.ranges
-        self.heartRateTimelineStatus = snapshot.status
+        // @Published fires on every assignment, and each notification-driven refresh lands
+        // here on a timer-like cadence; only publish when the rendered content changed.
+        if self.heartRateHourlyRanges != snapshot.ranges {
+          self.heartRateHourlyRanges = snapshot.ranges
+        }
+        if self.heartRateTimelineStatus != snapshot.status {
+          self.heartRateTimelineStatus = snapshot.status
+        }
       }
     }
   }

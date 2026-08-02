@@ -9,6 +9,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::protocol::device_timestamp_subsecond_millis;
+
 pub const HISTORICAL_SYNC_DRY_RUN_SCHEMA: &str = "goose.historical-sync-dry-run.v1";
 pub const HISTORICAL_SYNC_DRY_RUN_REPORT_SCHEMA: &str = "goose.historical-sync-dry-run-report.v1";
 pub const HISTORICAL_SYNC_PHYSICAL_VALIDATION_SCHEMA: &str =
@@ -1899,11 +1901,13 @@ fn timestamp_packet_confirmed_rows(
                 return None;
             };
             let device_timestamp_subseconds = row.device_timestamp_subseconds.unwrap_or(0);
-            if device_timestamp_subseconds > 999 {
+            let Some(device_timestamp_millis) =
+                device_timestamp_subsecond_millis(device_timestamp_subseconds)
+            else {
                 return None;
-            }
-            let device_timestamp_unix_ms = i64::from(device_timestamp_seconds) * 1_000
-                + i64::from(device_timestamp_subseconds);
+            };
+            let device_timestamp_unix_ms =
+                i64::from(device_timestamp_seconds) * 1_000 + device_timestamp_millis;
             (timestamp_row_matches_signal(&packet_kind, &source_signal, required_signal)
                 && plausible_unix_timestamp_seconds(device_timestamp_seconds)
                 && row.sample_time_source.as_deref() == Some("device_timestamp")

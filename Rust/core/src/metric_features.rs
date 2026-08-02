@@ -17,6 +17,7 @@ use crate::{
     },
     protocol::{
         DataPacketBodySummary, I16SeriesSummary, ParsedPayload, decode_hex_with_whitespace,
+        device_timestamp_subsecond_millis,
     },
     store::{DecodedFrameRow, GooseStore},
     validation_labels::{
@@ -6267,19 +6268,22 @@ fn normalized_sample_time(
     if let Some(seconds) = timestamp_seconds
         && plausible_unix_timestamp_seconds(seconds)
     {
-        if let Some(subseconds) = timestamp_subseconds
-            && subseconds > 999
-        {
-            quality_flags.insert("device_timestamp_subseconds_out_of_range".to_string());
-            quality_flags.insert("sample_time_from_capture_time".to_string());
-            return NormalizedSampleTime {
-                time: row.captured_at.clone(),
-                unix_ms: parse_rfc3339_utc_unix_ms(&row.captured_at),
-                source: "captured_at".to_string(),
-            };
-        }
+        let millis = match timestamp_subseconds {
+            Some(subseconds) => match device_timestamp_subsecond_millis(subseconds) {
+                Some(millis) => millis,
+                None => {
+                    quality_flags.insert("device_timestamp_subseconds_out_of_range".to_string());
+                    quality_flags.insert("sample_time_from_capture_time".to_string());
+                    return NormalizedSampleTime {
+                        time: row.captured_at.clone(),
+                        unix_ms: parse_rfc3339_utc_unix_ms(&row.captured_at),
+                        source: "captured_at".to_string(),
+                    };
+                }
+            },
+            None => 0,
+        };
         quality_flags.insert("sample_time_from_device_timestamp".to_string());
-        let millis = timestamp_subseconds.map_or(0, i64::from);
         let unix_ms = i64::from(seconds) * 1_000 + millis;
         return NormalizedSampleTime {
             time: unix_ms_to_rfc3339_utc(unix_ms),

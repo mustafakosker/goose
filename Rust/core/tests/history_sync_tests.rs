@@ -315,7 +315,9 @@ fn physical_historical_sync_evidence_requires_sample_time_to_match_device_timest
 #[test]
 fn physical_historical_sync_evidence_rejects_invalid_timestamp_subseconds() {
     let mut input = physical_validation_input();
-    input.timestamp_evidence[0].device_timestamp_subseconds = Some(1_500);
+    // Sub-seconds are 32.768 kHz ticks, so a full second is 32768: only values at or above
+    // that cannot be a tick count and disqualify the evidence.
+    input.timestamp_evidence[0].device_timestamp_subseconds = Some(40_000);
     input.timestamp_evidence[0].sample_time = Some("2026-01-01T22:00:00.999Z".to_string());
 
     let report = validate_historical_sync_physical_evidence(&input);

@@ -1243,15 +1243,64 @@ fn motion_feature_extraction_normalizes_historical_k21_sample_time() {
 }
 
 #[test]
-fn motion_feature_extraction_rejects_invalid_device_timestamp_subseconds() {
+fn motion_feature_extraction_reads_device_subseconds_as_32768_hz_ticks() {
     let store = GooseStore::open_in_memory().unwrap();
+    // The band counts sub-seconds in ticks of its 32.768 kHz RTC, so half a second is
+    // 16384 ticks, not 500. Reading the field as milliseconds discarded every historical
+    // sample whose tick count exceeded 999 and filed a whole night under its download time.
     import_motion_frame_at_value_with_device_timestamp_subseconds(
         &store,
         "user-owned-live-notification",
         "2026-01-01T20:00:00Z",
         1000,
         1_767_304_800,
-        1_500,
+        16_384,
+    );
+
+    let report = run_motion_feature_report_for_store(
+        &store,
+        "test-db",
+        "2026-01-01T19:00:00Z",
+        "2026-01-01T21:00:00Z",
+        MotionFeatureOptions {
+            min_owned_captures_per_summary: 1,
+            require_trusted_evidence: true,
+        },
+    )
+    .unwrap();
+
+    assert!(report.pass, "{:?}", report.issues);
+    assert_eq!(report.feature_count, 1);
+    let feature = &report.features[0];
+    assert_eq!(feature.sample_time_source, "device_timestamp");
+    assert_eq!(feature.sample_time_unix_ms, Some(1_767_304_800_500));
+    assert_eq!(feature.device_timestamp_subseconds, Some(16_384));
+    assert!(
+        feature
+            .quality_flags
+            .iter()
+            .any(|flag| flag == "sample_time_from_device_timestamp")
+    );
+    assert!(
+        !feature
+            .quality_flags
+            .iter()
+            .any(|flag| flag == "device_timestamp_subseconds_out_of_range")
+    );
+}
+
+#[test]
+fn motion_feature_extraction_rejects_invalid_device_timestamp_subseconds() {
+    let store = GooseStore::open_in_memory().unwrap();
+    // A full second is 32768 ticks, so anything at or above that is not a real timestamp:
+    // k=2 realtime status frames reuse these header bytes for other fields.
+    import_motion_frame_at_value_with_device_timestamp_subseconds(
+        &store,
+        "user-owned-live-notification",
+        "2026-01-01T20:00:00Z",
+        1000,
+        1_767_304_800,
+        40_000,
     );
 
     let report = run_motion_feature_report_for_store(
@@ -1273,7 +1322,7 @@ fn motion_feature_extraction_rejects_invalid_device_timestamp_subseconds() {
     assert_eq!(feature.sample_time_source, "captured_at");
     assert_eq!(feature.sample_time_unix_ms, Some(1_767_297_600_000));
     assert_eq!(feature.device_timestamp_seconds, Some(1_767_304_800));
-    assert_eq!(feature.device_timestamp_subseconds, Some(1_500));
+    assert_eq!(feature.device_timestamp_subseconds, Some(40_000));
     assert!(
         feature
             .quality_flags

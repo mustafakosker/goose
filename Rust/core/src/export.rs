@@ -24,6 +24,7 @@ use crate::{
     },
     protocol::{
         DataPacketBodySummary, I16SeriesSummary, ParsedPayload, decode_hex_with_whitespace,
+        device_timestamp_subsecond_millis,
     },
     store::{
         ActivityIntervalRow, ActivityLabelRow, ActivityMetricRow, ActivitySessionRow,
@@ -2586,19 +2587,25 @@ fn normalized_sensor_sample_time(
     if let Some(seconds) = timestamp_seconds
         && plausible_unix_timestamp_seconds(seconds)
     {
-        if let Some(subseconds) = timestamp_subseconds
-            && subseconds > 999
-        {
-            push_quality_flag_once(quality_flags, "device_timestamp_subseconds_out_of_range");
-            push_quality_flag_once(quality_flags, "sample_time_from_capture_time");
-            return NormalizedSensorSampleTime {
-                time: row.captured_at.clone(),
-                unix_ms: parse_rfc3339_utc_unix_ms(&row.captured_at),
-                source: "captured_at".to_string(),
-            };
-        }
+        let millis = match timestamp_subseconds {
+            Some(subseconds) => match device_timestamp_subsecond_millis(subseconds) {
+                Some(millis) => millis,
+                None => {
+                    push_quality_flag_once(
+                        quality_flags,
+                        "device_timestamp_subseconds_out_of_range",
+                    );
+                    push_quality_flag_once(quality_flags, "sample_time_from_capture_time");
+                    return NormalizedSensorSampleTime {
+                        time: row.captured_at.clone(),
+                        unix_ms: parse_rfc3339_utc_unix_ms(&row.captured_at),
+                        source: "captured_at".to_string(),
+                    };
+                }
+            },
+            None => 0,
+        };
         push_quality_flag_once(quality_flags, "sample_time_from_device_timestamp");
-        let millis = timestamp_subseconds.map_or(0, i64::from);
         let unix_ms = i64::from(seconds) * 1_000 + millis;
         return NormalizedSensorSampleTime {
             time: unix_ms_to_rfc3339_utc(unix_ms),

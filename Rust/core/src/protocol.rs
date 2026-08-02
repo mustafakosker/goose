@@ -21,6 +21,24 @@ pub const PACKET_TYPE_RELATIVE_BATTERY_PACK_CONSOLE_LOGS: u8 = 55;
 pub const PACKET_TYPE_PUFFIN_METADATA: u8 = 56;
 pub const COMMAND_GET_HELLO: u8 = 145;
 
+/// Data packet headers carry a sub-second field counted in ticks of the band's 32.768 kHz
+/// RTC, not in milliseconds. A full second is 32768 ticks, so a valid field is 0..=32767.
+pub const DEVICE_TIMESTAMP_SUBSECOND_TICKS_PER_SECOND: u32 = 32_768;
+
+/// Converts a device sub-second tick count to milliseconds, or `None` when the field cannot
+/// be a tick count at all.
+///
+/// Out-of-range values are not corrupt timestamps to be salvaged: `packet_k` 2 realtime status
+/// frames omit the 13-byte data packet header the other families use, so the generic parser
+/// reads unrelated payload bytes into this field. Callers fall back to capture time for those.
+pub fn device_timestamp_subsecond_millis(subseconds: u16) -> Option<i64> {
+    let ticks = u32::from(subseconds);
+    if ticks >= DEVICE_TIMESTAMP_SUBSECOND_TICKS_PER_SECOND {
+        return None;
+    }
+    Some(i64::from(ticks) * 1_000 / i64::from(DEVICE_TIMESTAMP_SUBSECOND_TICKS_PER_SECOND))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum DeviceType {

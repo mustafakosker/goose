@@ -990,7 +990,7 @@ fn raw_export_sensor_samples_reject_invalid_device_timestamp_subseconds() {
         source: "ios.corebluetooth.notification".to_string(),
         captured_at: "2026-01-01T20:00:00Z".to_string(),
         device_model: "WHOOP 5.0 Goose".to_string(),
-        frame_hex: k10_motion_frame_hex_with_timestamp_subseconds(1_767_304_800, 1_500),
+        frame_hex: k10_motion_frame_hex_with_timestamp_subseconds(1_767_304_800, 40_000),
         sensitivity: "user-owned-live-notification".to_string(),
         capture_session_id: None,
         device_type: DeviceType::Goose,
@@ -1026,9 +1026,62 @@ fn raw_export_sensor_samples_reject_invalid_device_timestamp_subseconds() {
     assert!(sensor_samples.contains("\"sample_time\":\"2026-01-01T20:00:00Z\""));
     assert!(sensor_samples.contains("\"sample_time_source\":\"captured_at\""));
     assert!(sensor_samples.contains("\"sample_time_unix_ms\":1767297600000"));
-    assert!(sensor_samples.contains("\"device_timestamp_subseconds\":1500"));
+    assert!(sensor_samples.contains("\"device_timestamp_subseconds\":40000"));
     assert!(sensor_samples.contains("device_timestamp_subseconds_out_of_range"));
     assert!(!sensor_samples.contains("\"sample_time\":\"2026-01-01T22:00:01Z\""));
+}
+
+#[test]
+fn raw_export_sensor_samples_read_device_subseconds_as_32768_hz_ticks() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let db_path = tempdir.path().join("goose.sqlite");
+    let export_dir = tempdir.path().join("tick-subsecond-sensor-samples.goosebundle");
+    let store = GooseStore::open(&db_path).unwrap();
+
+    // 16384 ticks of the band's 32.768 kHz RTC is half a second, so the exported sample time
+    // must be the device timestamp plus 500 ms rather than the time the frame was captured.
+    let frames = vec![CapturedFrameInput {
+        evidence_id: "tick-subsecond-motion".to_string(),
+        frame_id: Some("tick-subsecond-motion.frame.0".to_string()),
+        source: "ios.corebluetooth.notification".to_string(),
+        captured_at: "2026-01-01T20:00:00Z".to_string(),
+        device_model: "WHOOP 5.0 Goose".to_string(),
+        frame_hex: k10_motion_frame_hex_with_timestamp_subseconds(1_767_304_800, 16_384),
+        sensitivity: "user-owned-live-notification".to_string(),
+        capture_session_id: None,
+        device_type: DeviceType::Goose,
+    }];
+    let import_report = import_captured_frame_batch(
+        &store,
+        &frames,
+        CapturedFrameBatchOptions {
+            parser_version: "goose-core/test",
+        },
+    )
+    .unwrap();
+    assert!(import_report.pass, "{:?}", import_report.issues);
+
+    let report = export_raw_timeframe(
+        &store,
+        RawExportOptions {
+            output_dir: &export_dir,
+            start: "2026-01-01T19:00:00Z",
+            end: "2026-01-01T23:00:00Z",
+            app_version: "goose-app/test",
+            core_version: "goose-core/test",
+            data_families: vec!["sensor_samples".to_string()],
+            filters: Default::default(),
+            sqlite_source_path: Some(&db_path),
+            zip_output_path: None,
+        },
+    )
+    .unwrap();
+
+    assert!(report.pass, "{:?}", report.issues);
+    let sensor_samples = fs::read_to_string(export_dir.join("data/sensor_samples.jsonl")).unwrap();
+    assert!(sensor_samples.contains("\"sample_time_source\":\"device_timestamp\""));
+    assert!(sensor_samples.contains("\"sample_time_unix_ms\":1767304800500"));
+    assert!(!sensor_samples.contains("device_timestamp_subseconds_out_of_range"));
 }
 
 #[test]

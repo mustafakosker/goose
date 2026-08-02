@@ -1,4 +1,5 @@
 .DS_Store
+.tmp-goosebundle/
 xcuserdata/
 *.xcuserstate
 **/*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings

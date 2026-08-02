@@ -3,10 +3,35 @@ import Foundation
 import SwiftUI
 import UIKit
 
+/// Watches the two band-sync signals the Sleep page reacts to, without making the whole
+/// page an observer of `GooseBLEClient`.
+///
+/// Live heart-rate state republishes on that object up to five times a second while a band
+/// is worn (`BLEUIStateAggregator`), and any view observing it rebuilds on every one of those.
+/// The Sleep page renders nothing from live heart rate, so only this zero-size view pays for
+/// the churn; its body is a `Color.clear`, while the page rebuilds solely when sleep data,
+/// the selected date, or navigation state changes.
+private struct SleepBandSyncSignalObserver: View {
+  @ObservedObject var ble: GooseBLEClient
+  let onReadinessChange: () -> Void
+  let onStatusChange: (String) -> Void
+
+  var body: some View {
+    Color.clear
+      .onChange(of: ble.canSyncHistorical) { _, _ in
+        onReadinessChange()
+      }
+      .onChange(of: ble.historicalSyncStatus) { _, newValue in
+        onStatusChange(newValue)
+      }
+  }
+}
+
 struct SleepV2OverviewPage: View {
   @EnvironmentObject private var router: AppRouter
   @ObservedObject var store: HealthDataStore
-  @ObservedObject var ble: GooseBLEClient
+  // Deliberately not observed: see SleepBandSyncSignalObserver.
+  let ble: GooseBLEClient
   @Binding var selectedDate: Date
   @Environment(\.colorScheme) private var colorScheme
   @State private var showingInsightsSheet = false
@@ -143,16 +168,21 @@ struct SleepV2OverviewPage: View {
       store.loadBridgeCatalogsIfNeeded()
       startBandSleepSyncIfReady()
     }
-    .onChange(of: ble.canSyncHistorical) { _, _ in
-      startBandSleepSyncIfReady()
-    }
-    .onChange(of: ble.historicalSyncStatus) { _, newValue in
-      if newValue == "synced" {
-        store.refreshSleepAfterBandSync(packetCount: ble.historicalPacketCount)
-      } else if newValue == "failed" {
-        store.markBandSleepSyncFailed(ble.historicalSyncStatus)
-      }
-    }
+    .background(
+      SleepBandSyncSignalObserver(
+        ble: ble,
+        onReadinessChange: {
+          startBandSleepSyncIfReady()
+        },
+        onStatusChange: { newValue in
+          if newValue == "synced" {
+            store.refreshSleepAfterBandSync(packetCount: ble.historicalPacketCount)
+          } else if newValue == "failed" {
+            store.markBandSleepSyncFailed(ble.historicalSyncStatus)
+          }
+        }
+      )
+    )
     .sheet(isPresented: $showingDatePicker) {
       ScoreDatePickerSheet(
         title: "Sleep",

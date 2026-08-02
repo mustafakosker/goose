@@ -412,10 +412,14 @@ extension HealthDataStore {
     return text
   }
 
-  static func groupedIntegerText(_ value: Int) -> String {
+  private static let groupedIntegerFormatter: NumberFormatter = {
     let formatter = NumberFormatter()
     formatter.numberStyle = .decimal
-    return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    return formatter
+  }()
+
+  static func groupedIntegerText(_ value: Int) -> String {
+    groupedIntegerFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
   }
 
   struct LiveRRDerivedHRVSample {
@@ -579,17 +583,27 @@ extension HealthDataStore {
     return formatter.date(from: text)
   }
 
-  static func timeLabel(_ date: Date) -> String {
+  /// Building a formatter costs far more than formatting with one, and these run per stress
+  /// window and per snapshot. They are configured once and never mutated afterwards.
+  private static let timeLabelFormatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.timeStyle = .short
     formatter.dateStyle = .none
-    return formatter.string(from: date)
+    return formatter
+  }()
+
+  private static let dateLabelFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "dd/MM/yyyy"
+    return formatter
+  }()
+
+  static func timeLabel(_ date: Date) -> String {
+    timeLabelFormatter.string(from: date)
   }
 
   static func dateLabel(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "dd/MM/yyyy"
-    return formatter.string(from: date)
+    dateLabelFormatter.string(from: date)
   }
 
   static func algorithmRows(from value: Any) -> [[String: Any]] {
@@ -1027,8 +1041,12 @@ extension HealthDataStore {
     if abs(date.timeIntervalSinceNow) < 10 {
       return "Now"
     }
+    return relativeFormatter.localizedString(for: date, relativeTo: Date()).capitalized
+  }
+
+  private static let relativeFormatter: RelativeDateTimeFormatter = {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .short
-    return formatter.localizedString(for: date, relativeTo: Date()).capitalized
-  }
+    return formatter
+  }()
 }

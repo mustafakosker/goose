@@ -513,6 +513,65 @@ fn short_data_packets_preserve_raw_body_and_warn() {
     );
 }
 
+/// Captured from a WHOOP 5.0 band on 2026-08-02 while worn. Byte 8 carries the
+/// live heart rate in BPM; this frame was recorded at 72 bpm.
+const CAPTURED_K2_REALTIME_STATUS_72_BPM: [u8; 20] = [
+    PACKET_TYPE_REALTIME_DATA,
+    2,
+    0xaf,
+    0x44,
+    0x6d,
+    0x38,
+    0x3d,
+    0x6a,
+    72,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+];
+
+fn k2_body_summary(payload: &[u8]) -> Option<DataPacketBodySummary> {
+    let frame = build_v5_payload_frame(payload);
+    let parsed = parse_frame(DeviceType::Goose, &frame).unwrap();
+    match parsed.parsed_payload {
+        Some(ParsedPayload::DataPacket { body_summary, .. }) => body_summary,
+        other => panic!("expected a data packet payload, got {other:?}"),
+    }
+}
+
+#[test]
+fn parses_captured_k2_realtime_status_heart_rate() {
+    let summary = k2_body_summary(&CAPTURED_K2_REALTIME_STATUS_72_BPM);
+
+    assert_eq!(
+        summary,
+        Some(DataPacketBodySummary::RealtimeStatusK2 {
+            heart_rate: Some(72)
+        })
+    );
+}
+
+#[test]
+fn treats_zero_k2_heart_rate_byte_as_no_reading() {
+    let mut payload = CAPTURED_K2_REALTIME_STATUS_72_BPM;
+    payload[8] = 0;
+
+    let summary = k2_body_summary(&payload);
+
+    assert_eq!(
+        summary,
+        Some(DataPacketBodySummary::RealtimeStatusK2 { heart_rate: None })
+    );
+}
+
 fn put_u16(bytes: &mut [u8], offset: usize, value: u16) {
     bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
 }

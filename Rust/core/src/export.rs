@@ -2390,6 +2390,7 @@ fn export_sensor_samples(
                     )?;
                 }
             }
+            DataPacketBodySummary::RealtimeStatusK2 { .. } => {}
         }
     }
     Ok(rows)

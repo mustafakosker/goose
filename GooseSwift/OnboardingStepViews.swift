@@ -346,6 +346,7 @@ struct OnboardingStandardActionBar: View {
 
 struct OnboardingConnectActionBar: View {
   @ObservedObject var ble: GooseBLEClient
+  let showBack: Bool
   let onBack: () -> Void
   let readyTitle: String
   let onComplete: () -> Void
@@ -367,13 +368,15 @@ struct OnboardingConnectActionBar: View {
           .frame(maxWidth: .infinity)
       }
 
-      Button(action: onBack) {
-        Label("Back", systemImage: "chevron.left")
-          .labelStyle(.titleAndIcon)
-          .frame(maxWidth: .infinity)
+      if showBack {
+        Button(action: onBack) {
+          Label("Back", systemImage: "chevron.left")
+            .labelStyle(.titleAndIcon)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
       }
-      .buttonStyle(.bordered)
-      .controlSize(.large)
     }
     .padding(16)
     .background(.regularMaterial)

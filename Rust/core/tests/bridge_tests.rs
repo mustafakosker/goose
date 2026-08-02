@@ -22,8 +22,8 @@ use goose_core::{
     fixtures::build_fixture_index,
     metrics::{GOOSE_HRV_V0_ID, GOOSE_HRV_V0_VERSION, built_in_algorithm_definitions},
     protocol::{
-        DeviceType, PACKET_TYPE_EVENT, PACKET_TYPE_HISTORICAL_DATA, PACKET_TYPE_REALTIME_RAW_DATA,
-        build_v5_payload_frame, parse_frame_hex,
+        DeviceType, PACKET_TYPE_EVENT, PACKET_TYPE_HISTORICAL_DATA, PACKET_TYPE_REALTIME_DATA,
+        PACKET_TYPE_REALTIME_RAW_DATA, build_v5_payload_frame, parse_frame_hex,
     },
     recovery_rollup::{
         GOOSE_RECOVERY_UNAVAILABLE_STATUS_V0_ID, GOOSE_RECOVERY_UNAVAILABLE_STATUS_V0_VERSION,
@@ -8716,4 +8716,30 @@ fn put_u16(bytes: &mut [u8], offset: usize, value: u16) {
 
 fn put_i16(bytes: &mut [u8], offset: usize, value: i16) {
     bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+}
+
+fn k2_realtime_status_frame_hex(heart_rate: u8) -> String {
+    let mut payload = vec![0; 20];
+    payload[0] = PACKET_TYPE_REALTIME_DATA;
+    payload[1] = 2;
+    payload[8] = heart_rate;
+    hex::encode(build_v5_payload_frame(&payload))
+}
+
+#[test]
+fn compact_frame_summary_exposes_k2_realtime_status_heart_rate() {
+    let response = request(serde_json::json!({
+        "schema": "goose.bridge.request.v1",
+        "request_id": "k2-compact",
+        "method": "protocol.parse_frame_hex_batch",
+        "args": {
+            "device_type": "goose",
+            "frames": [k2_realtime_status_frame_hex(72)],
+        }
+    }));
+
+    assert!(response.ok, "{:?}", response.error);
+    let compact = &response.result.unwrap()["results"][0]["compact"];
+    assert_eq!(compact["heart_rate"], 72);
+    assert_eq!(compact["body_kind"], "realtime_status_k2");
 }

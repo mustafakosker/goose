@@ -297,12 +297,14 @@ struct HomeCardSurfaceModifier: ViewModifier {
                 )
               )
           }
+          // Shadowing the card shape rather than the modified content keeps SwiftUI from
+          // rendering the whole subtree, text included, offscreen to derive the shadow.
+          .shadow(color: shadowColor, radius: prominent ? 5 : 2, x: 0, y: prominent ? 3 : 1)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
           .strokeBorder(tint.opacity(borderOpacity), lineWidth: 1)
       }
-      .shadow(color: shadowColor, radius: prominent ? 5 : 2, x: 0, y: prominent ? 3 : 1)
   }
 
   private var baseFill: Color {

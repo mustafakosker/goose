@@ -11,10 +11,12 @@ struct HomeDashboardView: View {
   @State private var selectedHealthMonitorTrend: HealthMetricSnapshot?
 
   var body: some View {
+    let snapshots = HomeSnapshotSet(store: healthStore, model: model, selectedDate: selectedDate)
+
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 18) {
         HomeDailyScoreCard(
-          scores: scoreSnapshots,
+          scores: snapshots.scores,
           actionSummary: dailyActionSummary,
           coachTip: CoachTipFactory.homeTip(healthStore: healthStore, appModel: model),
           openScore: openHealth,
@@ -22,13 +24,13 @@ struct HomeDashboardView: View {
         )
 
         HomeStressEnergySection(
-          stress: landingSnapshot(for: .stress),
-          energy: landingSnapshot(for: .energyBank),
+          stress: snapshots.landing(for: .stress),
+          energy: snapshots.landing(for: .energyBank),
           openStress: { openHealth(.stress) }
         )
 
         HomeCardioLoadWidget(
-          snapshot: landingSnapshot(for: .cardioLoad),
+          snapshot: snapshots.landing(for: .cardioLoad),
           days: healthStore.cardioLoadWeeklyPoints()
         ) {
           showingCardioLoadSheet = true
@@ -41,9 +43,9 @@ struct HomeDashboardView: View {
         )
 
         HomeTimelineSection(
-          sleep: homeSnapshot(for: .sleep),
-          activity: homeSnapshot(for: .strain),
-          recovery: homeSnapshot(for: .recovery),
+          sleep: snapshots.home(for: .sleep),
+          activity: snapshots.home(for: .strain),
+          recovery: snapshots.home(for: .recovery),
           activities: model.homeActivityTimelineItems,
           openSleep: { openHealth(.sleep) },
           openActivity: { openHealth(.strain) },
@@ -115,19 +117,12 @@ struct HomeDashboardView: View {
     }
   }
 
-  private var scoreSnapshots: [HealthMetricSnapshot] {
-    [
-      datedHomeSnapshot(for: .sleep),
-      datedHomeSnapshot(for: .recovery),
-      datedHomeSnapshot(for: .strain),
-    ]
-  }
-
   private var scorePickerSnapshots: [HealthMetricSnapshot] {
-    [
-      homeSnapshot(for: .sleep),
-      homeSnapshot(for: .recovery),
-      homeSnapshot(for: .strain),
+    let snapshots = HomeSnapshotSet(store: healthStore, model: model, selectedDate: selectedDate)
+    return [
+      snapshots.home(for: .sleep),
+      snapshots.home(for: .recovery),
+      snapshots.home(for: .strain),
     ]
   }
 
@@ -156,8 +151,38 @@ struct HomeDashboardView: View {
     return healthStore.packetDerivedScoreNextActionSummary()
   }
 
-  private var landingSnapshots: [HealthMetricSnapshot] {
-    healthStore.landingSnapshots(
+  private func openHealth(_ route: HealthRoute) {
+    openHealthRoute(route)
+    model.recordUIAction("health.deep_link.opened", detail: route.title)
+  }
+
+  private func openHealthMonitorSnapshot(_ snapshot: HealthMetricSnapshot) {
+    if snapshot.id == "resting-hr" {
+      selectedHealthMonitorTrend = snapshot
+    } else {
+      openHealth(.healthMonitor)
+    }
+  }
+
+  private func openCoach(_ prompt: String) {
+    router.openCoach(prompt: prompt)
+    model.recordUIAction("coach.opened", detail: "Home daily score card")
+  }
+}
+
+/// Every card on Home reads from the same landing snapshot set. Deriving that set costs a full
+/// walk of today's heart-rate samples, so it is built once per body pass and shared, rather than
+/// recomputed per card.
+private struct HomeSnapshotSet {
+  private let store: HealthDataStore
+  private let landingSnapshots: [HealthMetricSnapshot]
+  private let selectedDate: Date
+
+  @MainActor
+  init(store: HealthDataStore, model: GooseAppModel, selectedDate: Date) {
+    self.store = store
+    self.selectedDate = selectedDate
+    landingSnapshots = store.landingSnapshots(
       liveHeartRateBPM: model.ble.liveHeartRateBPM,
       liveHeartRateSource: model.ble.liveHeartRateSource,
       liveHeartRateUpdatedAt: model.ble.liveHeartRateUpdatedAt,
@@ -165,12 +190,28 @@ struct HomeDashboardView: View {
     )
   }
 
-  private func landingSnapshot(for route: HealthRoute) -> HealthMetricSnapshot {
-    landingSnapshots.first { $0.route == route } ?? healthStore.snapshot(for: route)
+  @MainActor
+  var scores: [HealthMetricSnapshot] {
+    [HealthRoute.sleep, .recovery, .strain].map {
+      ScoreDateTimeline.datedSnapshot(from: home(for: $0), date: selectedDate)
+    }
   }
 
-  private func homeSnapshot(for route: HealthRoute) -> HealthMetricSnapshot {
-    let snapshot = landingSnapshot(for: route)
+  @MainActor
+  func landing(for route: HealthRoute) -> HealthMetricSnapshot {
+    landingSnapshots.first { $0.route == route } ?? store.snapshot(for: route)
+  }
+
+  @MainActor
+  func home(for route: HealthRoute) -> HealthMetricSnapshot {
+    Self.homeSnapshot(from: landing(for: route), route: route)
+  }
+
+  /// Strain arrives on a 0-21 scale; Home shows every score as a percentage.
+  private static func homeSnapshot(
+    from snapshot: HealthMetricSnapshot,
+    route: HealthRoute
+  ) -> HealthMetricSnapshot {
     guard route == .strain, snapshot.unit != "%" else {
       return snapshot
     }
@@ -191,28 +232,6 @@ struct HomeDashboardView: View {
       tint: snapshot.tint,
       trend: snapshot.trend
     )
-  }
-
-  private func datedHomeSnapshot(for route: HealthRoute) -> HealthMetricSnapshot {
-    ScoreDateTimeline.datedSnapshot(from: homeSnapshot(for: route), date: selectedDate)
-  }
-
-  private func openHealth(_ route: HealthRoute) {
-    openHealthRoute(route)
-    model.recordUIAction("health.deep_link.opened", detail: route.title)
-  }
-
-  private func openHealthMonitorSnapshot(_ snapshot: HealthMetricSnapshot) {
-    if snapshot.id == "resting-hr" {
-      selectedHealthMonitorTrend = snapshot
-    } else {
-      openHealth(.healthMonitor)
-    }
-  }
-
-  private func openCoach(_ prompt: String) {
-    router.openCoach(prompt: prompt)
-    model.recordUIAction("coach.opened", detail: "Home daily score card")
   }
 }
 

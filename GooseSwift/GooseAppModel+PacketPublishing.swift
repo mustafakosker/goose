@@ -342,16 +342,32 @@ extension GooseAppModel {
     }
   }
 
+  static let heartRateBodyKinds: Set<String> = ["raw_motion_k10", "realtime_status_k2"]
+
   static func extractHeartRate(from parsed: [String: Any]) -> Int? {
     guard
       let payload = parsed["parsed_payload"] as? [String: Any],
       payload["kind"] as? String == "data_packet",
       let body = payload["body_summary"] as? [String: Any],
-      body["kind"] as? String == "raw_motion_k10"
+      let bodyKind = body["kind"] as? String,
+      heartRateBodyKinds.contains(bodyKind)
     else {
       return nil
     }
     return intValue(body["heart_rate"])
+  }
+
+  /// Live heart rate reaches us from more than one packet family, so the source label
+  /// has to follow the packet the value actually came from.
+  static func liveHeartRateSource(forBodyKind bodyKind: String?) -> (source: String, detail: String) {
+    switch bodyKind {
+    case "realtime_status_k2":
+      return ("rust.k2", "realtime_status_k2 heart-rate byte")
+    case "raw_motion_k10":
+      return ("rust.k10", "raw_motion_k10 embedded heart-rate byte")
+    default:
+      return ("rust.packet", "packet-derived heart-rate byte")
+    }
   }
 
   static func extractMovementPacket(

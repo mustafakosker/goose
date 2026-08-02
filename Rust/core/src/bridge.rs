@@ -2597,7 +2597,8 @@ fn compact_parsed_frame_summary(parsed: &ParsedFrame) -> serde_json::Value {
             let domain_text = domain.as_deref().unwrap_or("unknown");
             let body_kind = body_summary_kind(body_summary.as_ref());
             let heart_rate = match body_summary.as_ref() {
-                Some(DataPacketBodySummary::RawMotionK10 { heart_rate, .. }) => *heart_rate,
+                Some(DataPacketBodySummary::RawMotionK10 { heart_rate, .. })
+                | Some(DataPacketBodySummary::RealtimeStatusK2 { heart_rate }) => *heart_rate,
                 _ => None,
             };
             let movement = compact_k10_movement_summary(body_summary.as_ref());
@@ -2677,6 +2678,7 @@ fn body_summary_kind(summary: Option<&DataPacketBodySummary>) -> &'static str {
             "r17_optical_or_labrador_filtered"
         }
         Some(DataPacketBodySummary::RawMotionK10 { .. }) => "raw_motion_k10",
+        Some(DataPacketBodySummary::RealtimeStatusK2 { .. }) => "realtime_status_k2",
         Some(DataPacketBodySummary::RawMotionK21 { .. }) => "raw_motion_k21",
         None => "none",
     }

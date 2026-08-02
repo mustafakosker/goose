@@ -670,6 +670,7 @@ fn body_summary_kind(summary: &DataPacketBodySummary) -> &'static str {
             "r17_optical_or_labrador_filtered"
         }
         DataPacketBodySummary::RawMotionK10 { .. } => "raw_motion_k10",
+        DataPacketBodySummary::RealtimeStatusK2 { .. } => "realtime_status_k2",
         DataPacketBodySummary::RawMotionK21 { .. } => "raw_motion_k21",
     }
 }

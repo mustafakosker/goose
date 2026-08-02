@@ -69,14 +69,24 @@ final class HeartRateSeriesStore {
   private let url: URL
   private let stateLock = NSLock()
   private let writeQueue = DispatchQueue(label: "com.goose.swift.heart-rate-series", qos: .utility)
+  /// Always kept sorted by `capturedAt`; `prune` and every range read rely on it.
   private var samples: [HeartRateSamplePoint]
   private var pendingWrite: DispatchWorkItem?
   private var lastNotificationAt = Date.distantPast
+  private var storedRevision: UInt64 = 0
 
   init(url: URL = HeartRateSeriesStore.defaultURL()) {
     self.url = url
     self.samples = Self.loadSamples(from: url)
     prune(relativeTo: Date())
+  }
+
+  /// Bumped on every accepted sample. Readers that derive expensive values from a day of
+  /// samples cache against this so they only recompute when the series actually changed.
+  var revision: UInt64 {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    return storedRevision
   }
 
   func append(bpm: Int, source: String, capturedAt: Date) -> Bool {
@@ -92,7 +102,13 @@ final class HeartRateSeriesStore {
       return false
     }
 
-    samples.append(HeartRateSamplePoint(bpm: bpm, source: source, capturedAt: capturedAt))
+    let point = HeartRateSamplePoint(bpm: bpm, source: source, capturedAt: capturedAt)
+    if let last = samples.last, capturedAt < last.capturedAt {
+      samples.insert(point, at: upperBoundLocked(for: capturedAt))
+    } else {
+      samples.append(point)
+    }
+    storedRevision &+= 1
     prune(relativeTo: capturedAt)
     schedulePersist()
     let shouldPostUpdate = markUpdateNotificationIfNeeded()
@@ -101,6 +117,42 @@ final class HeartRateSeriesStore {
       NotificationCenter.default.post(name: Self.didUpdateNotification, object: self)
     }
     return true
+  }
+
+  /// First index whose sample is not older than `date`.
+  private func lowerBoundLocked(for date: Date) -> Int {
+    var low = 0
+    var high = samples.count
+    while low < high {
+      let mid = low + (high - low) / 2
+      if samples[mid].capturedAt < date {
+        low = mid + 1
+      } else {
+        high = mid
+      }
+    }
+    return low
+  }
+
+  /// First index whose sample is newer than `date`.
+  private func upperBoundLocked(for date: Date) -> Int {
+    var low = 0
+    var high = samples.count
+    while low < high {
+      let mid = low + (high - low) / 2
+      if samples[mid].capturedAt <= date {
+        low = mid + 1
+      } else {
+        high = mid
+      }
+    }
+    return low
+  }
+
+  private func sliceLocked(from start: Date, to end: Date) -> ArraySlice<HeartRateSamplePoint> {
+    let lower = lowerBoundLocked(for: start)
+    let upper = max(lower, lowerBoundLocked(for: end))
+    return samples[lower..<upper]
   }
 
   func hourlyRanges(forDayContaining date: Date = Date(), calendar: Calendar = .current) -> [HeartRateHourlyRange] {
@@ -126,7 +178,7 @@ final class HeartRateSeriesStore {
     let bucketCount = max(1, Int(ceil(dayEnd.timeIntervalSince(dayStart) / 3600)))
     var buckets = Array(repeating: HeartRateHourlyBucket(), count: bucketCount)
 
-    for sample in samples where sample.capturedAt >= dayStart && sample.capturedAt < dayEnd {
+    for sample in sliceLocked(from: dayStart, to: dayEnd) {
       let hourOffset = Int(sample.capturedAt.timeIntervalSince(dayStart) / 3600)
       guard buckets.indices.contains(hourOffset) else {
         continue
@@ -160,9 +212,7 @@ final class HeartRateSeriesStore {
   func samples(from start: Date, to end: Date) -> [HeartRateSamplePoint] {
     stateLock.lock()
     defer { stateLock.unlock() }
-    return samples
-      .filter { $0.capturedAt >= start && $0.capturedAt < end }
-      .sorted { $0.capturedAt < $1.capturedAt }
+    return Array(sliceLocked(from: start, to: end))
   }
 
   func summary(forDayContaining date: Date = Date(), calendar: Calendar = .current) -> String {
@@ -190,18 +240,20 @@ final class HeartRateSeriesStore {
     defer { stateLock.unlock() }
     let dayStart = calendar.startOfDay(for: date)
     let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart.addingTimeInterval(24 * 60 * 60)
-    let daySamples = samples.filter { $0.capturedAt >= dayStart && $0.capturedAt < dayEnd }
-    let candidateSamples: [HeartRateSamplePoint]
+    let daySamples = sliceLocked(from: dayStart, to: dayEnd)
+    let candidateSamples: ArraySlice<HeartRateSamplePoint>
     if daySamples.count >= minimumSamples {
       candidateSamples = daySamples
     } else {
       let groupedByDay = Dictionary(grouping: samples) { sample in
         calendar.startOfDay(for: sample.capturedAt)
       }
-      candidateSamples = groupedByDay
-        .sorted { $0.key > $1.key }
-        .first { $0.value.count >= minimumSamples }?
-        .value ?? []
+      candidateSamples = ArraySlice(
+        groupedByDay
+          .sorted { $0.key > $1.key }
+          .first { $0.value.count >= minimumSamples }?
+          .value ?? []
+      )
     }
 
     guard candidateSamples.count >= minimumSamples else {

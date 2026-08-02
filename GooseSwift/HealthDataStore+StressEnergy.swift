@@ -3,11 +3,53 @@ import Foundation
 import SwiftUI
 import UIKit
 
+/// Identifies the inputs a stress summary is derived from, so a summary can be reused until
+/// one of them changes.
+struct StressSummaryCacheKey: Equatable {
+  let dayStart: Date
+  let heartRateRevision: UInt64
+  let allowLiveFallbacks: Bool
+  let previewMissingData: Bool
+  /// The summary carries a relative freshness string, so the cache has to expire on the same
+  /// granularity that string is rendered at even when no new sample has landed.
+  let freshnessBucket: Int
+}
+
 extension HealthDataStore {
+  /// Matches the granularity `relativeText` renders at, including its 10-second "Now" threshold.
+  static let stressSummaryFreshnessBucketSeconds: TimeInterval = 10
+
+  /// A single `HomeDashboardView` body pass asks for this many times over, and each run walks a
+  /// full day of heart-rate samples. The result only changes when a new sample lands, so cache
+  /// it against the series revision.
   func stressAlgorithmSummary(
     for date: Date = Date(),
     calendar: Calendar = .current,
     allowLiveFallbacks: Bool = true
+  ) -> StressAlgorithmSummary {
+    let key = StressSummaryCacheKey(
+      dayStart: calendar.startOfDay(for: date),
+      heartRateRevision: heartRateSeriesStore.revision,
+      allowLiveFallbacks: allowLiveFallbacks,
+      previewMissingData: previewMissingData,
+      freshnessBucket: Int(Date().timeIntervalSince1970 / Self.stressSummaryFreshnessBucketSeconds)
+    )
+    if let cached = stressSummaryCache, cached.key == key {
+      return cached.summary
+    }
+    let summary = computeStressAlgorithmSummary(
+      for: date,
+      calendar: calendar,
+      allowLiveFallbacks: allowLiveFallbacks
+    )
+    stressSummaryCache = (key: key, summary: summary)
+    return summary
+  }
+
+  private func computeStressAlgorithmSummary(
+    for date: Date,
+    calendar: Calendar,
+    allowLiveFallbacks: Bool
   ) -> StressAlgorithmSummary {
     guard !previewMissingData else {
       return emptyStressSummary(

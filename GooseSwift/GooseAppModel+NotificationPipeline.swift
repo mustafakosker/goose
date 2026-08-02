@@ -523,6 +523,7 @@ extension GooseAppModel {
         packetType: nil,
         healthPacketFamily: nil,
         heartRateBPM: nil,
+        heartRateBodyKind: nil,
         movementSample: nil,
         whoopEvent: nil,
         dataSignal: nil
@@ -540,6 +541,10 @@ extension GooseAppModel {
           ?? parsed.map { healthPacketCaptureFamily(for: $0, capturedAt: event.capturedAt) }
         : nil,
       heartRateBPM: compact?.heartRateBPM ?? parsed.flatMap(extractHeartRate),
+      heartRateBodyKind: compact?.bodyKind
+        ?? (parsed?["parsed_payload"] as? [String: Any])
+          .flatMap { $0["body_summary"] as? [String: Any] }
+          .flatMap { $0["kind"] as? String },
       movementSample: extractMovementPacket(
         from: parsed ?? [:],
         compact: compact,
@@ -631,11 +636,12 @@ extension GooseAppModel {
     }
 
     if let bpm = interpretation.heartRateBPM {
-      ble.recordLiveHeartRate(bpm, source: "rust.k10", at: event.capturedAt)
+      let origin = Self.liveHeartRateSource(forBodyKind: interpretation.heartRateBodyKind)
+      ble.recordLiveHeartRate(bpm, source: origin.source, at: event.capturedAt)
       recordDeviceSignalPoint(
         family: "HR",
         value: "\(bpm) bpm",
-        detail: "raw_motion_k10 embedded heart-rate byte",
+        detail: origin.detail,
         capturedAt: event.capturedAt,
         minimumInterval: 1
       )

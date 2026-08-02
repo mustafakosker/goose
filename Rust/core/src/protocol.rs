@@ -147,6 +147,9 @@ pub enum DataPacketBodySummary {
         axes: Vec<I16SeriesSummary>,
         warnings: Vec<String>,
     },
+    RealtimeStatusK2 {
+        heart_rate: Option<u8>,
+    },
     RawMotionK21 {
         field_x: Option<u16>,
         group_1_count: Option<u16>,
@@ -528,6 +531,7 @@ fn parse_data_packet_body_summary(
             }),
             Vec::new(),
         ),
+        2 => parse_k2_realtime_status_summary(payload),
         17 => parse_r17_body_summary(payload),
         10 => parse_k10_raw_motion_summary(payload),
         21 => parse_k21_raw_motion_summary(payload),
@@ -562,6 +566,21 @@ fn parse_r17_body_summary(payload: &[u8]) -> (Option<DataPacketBodySummary>, Vec
             warnings: warnings.clone(),
         }),
         warnings,
+    )
+}
+
+/// K2 realtime status carries the live heart rate as a single BPM byte at offset 8.
+///
+/// K2 does not follow the 13-byte data packet header the other families use, so the
+/// generic `counter_or_page` and `timestamp_seconds` fields are meaningless here and
+/// the heart rate byte sits inside the range the generic header calls a timestamp.
+/// A zero byte means the band has no reading rather than a heart rate of zero.
+fn parse_k2_realtime_status_summary(payload: &[u8]) -> (Option<DataPacketBodySummary>, Vec<String>) {
+    (
+        Some(DataPacketBodySummary::RealtimeStatusK2 {
+            heart_rate: payload.get(8).copied().filter(|bpm| *bpm > 0),
+        }),
+        Vec::new(),
     )
 }
 

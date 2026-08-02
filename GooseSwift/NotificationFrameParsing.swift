@@ -132,6 +132,7 @@ struct NotificationFrameInterpretation {
   let packetType: Int?
   let healthPacketFamily: HealthPacketCaptureFamily?
   let heartRateBPM: Int?
+  let heartRateBodyKind: String?
   let movementSample: MovementPacketSample?
   let whoopEvent: WhoopEventSample?
   let dataSignal: WhoopDataSignalSample?
